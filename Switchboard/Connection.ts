@@ -5,5 +5,6 @@ export default class Connection {
   constructor(websocket: WebSocket) {
     this.id = crypto.randomUUID();
     this.websocket = websocket;
+    
   }
 }

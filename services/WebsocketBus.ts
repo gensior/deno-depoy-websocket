@@ -1,4 +1,3 @@
-import Switchboard from "../Switchboard/Switchboard.ts";
 import Websocket from "./Websocket.ts";
 
 export default class WebsocketBus {
@@ -9,7 +8,6 @@ export default class WebsocketBus {
   }
 
   public send(message: unknown): void {
-    console.log("sending message");
     this._websocket.socket.send(JSON.stringify(message));
   }
 
