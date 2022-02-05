@@ -1,4 +1,4 @@
-export { serve } from "https://deno.land/std@0.120.0/http/server.ts";
+export { serve } from "https://deno.land/std@0.125.0/http/server.ts";
 export {
   None,
   type Option,
@@ -9,4 +9,9 @@ export {
   injectable,
   optional,
   token,
-} from "https://deno.land/x/ditox@v1.4.2/mod.ts";
+} from "https://deno.land/x/ditox@v2.2.0/mod.ts";
+export {
+  Mediator,
+  Notification,
+  Request,
+} from "https://deno.land/x/jimmy@v0.2.1/mod.ts";

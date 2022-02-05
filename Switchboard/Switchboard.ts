@@ -1,4 +1,4 @@
-import { None, Option, Some } from "../deps.ts";
+import { Mediator, None, Option, Some } from "../deps.ts";
 import Channel from "./Channel.ts";
 import Connection from "./Connection.ts";
 import { Dispatcher } from "./Dispatcher.ts";
@@ -8,12 +8,14 @@ export default class Switchboard {
   private readonly channels: Map<string, Channel>;
   private readonly connectionsToChannels: Map<string, string>;
   private readonly dispatcher: Dispatcher;
+  private readonly mediator: Mediator;
 
-  constructor(dispatcher: Dispatcher) {
+  constructor(dispatcher: Dispatcher, mediator: Mediator) {
     this.connections = new Map<string, Connection>();
     this.channels = new Map<string, Channel>();
     this.connectionsToChannels = new Map<string, string>();
     this.dispatcher = dispatcher;
+    this.mediator = mediator;
   }
 
   public registerSocket(websocket: WebSocket): Connection {
@@ -37,9 +39,15 @@ export default class Switchboard {
     else return None;
   }
 
-  public dispatch(message: string): void {
-    const json = JSON.parse(message);
-    const action = this.dispatcher.parseAction(json);
+  public dispatch(message: unknown): void {
+    const action = this.dispatcher.parseAction(message);
+
+    action.match({
+      some: (a) => {
+        this.mediator.send(a);
+      },
+      none: () => console.log("no action to take"),
+    });
   }
 
   public joinChannel(name: string, connection: Connection): void {

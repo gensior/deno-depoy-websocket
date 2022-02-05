@@ -7,11 +7,11 @@ export type Action =
   | SendMessage;
 
 export class Dispatcher {
-  public parseAction(message: string): Option<Action> {
-    const json = JSON.parse(message);
+  // deno-lint-ignore no-explicit-any
+  public parseAction(json: any): Option<Action> {
     if (json.action !== undefined) {
-      const action: string = json.action;
-      switch (action.toLowerCase()) {
+      const action: string = json.action.toLowerCase();
+      switch (action) {
         case "createlobby":
           return Some<CreateLobby>(
             new CreateLobby(json.data.name, json.data.user),

@@ -1,4 +1,12 @@
-import { createContainer, injectable, None, serve, token } from "./deps.ts";
+import {
+  createContainer,
+  injectable,
+  Mediator,
+  None,
+  serve,
+  token,
+} from "./deps.ts";
+import { ActionHandler } from "./Handlers/ActionHandler.ts";
 import Websocket from "./services/Websocket.ts";
 import WebsocketBus from "./services/WebsocketBus.ts";
 import Connection from "./Switchboard/Connection.ts";
@@ -10,19 +18,34 @@ const TOKENS = {
   Switchboard: token<Switchboard>("Switchboard token"),
   Websocket: token<Websocket>("Websocket token"),
   WebsocketBus: token<WebsocketBus>("Websocket Bus token"),
+  Mediator: token<Mediator>("Mediator token."),
+  ActionHandler: token<ActionHandler>("ActionHandler token"),
 };
 
 const mainContainer = createContainer();
+mainContainer.bindValue(
+  TOKENS.Mediator,
+  new Mediator(),
+);
 mainContainer.bindValue(TOKENS.Dispatcher, new Dispatcher());
+mainContainer.bindFactory(
+  TOKENS.ActionHandler,
+  injectable(
+    (mediator: Mediator) => new ActionHandler(mediator),
+    TOKENS.Mediator,
+  ),
+);
 mainContainer.bindFactory(
   TOKENS.Switchboard,
   injectable(
-    (dispatcher: Dispatcher) => new Switchboard(dispatcher),
+    (dispatcher: Dispatcher, mediator: Mediator) =>
+      new Switchboard(dispatcher, mediator),
     TOKENS.Dispatcher,
+    TOKENS.Mediator,
   ),
 );
 const switchboard = mainContainer.resolve(TOKENS.Switchboard);
-
+const _actionHandler = mainContainer.resolve(TOKENS.ActionHandler);
 type Client = {
   clientId: string;
   color: string;
@@ -51,7 +74,7 @@ serve((req) => {
   }
 
   const container = createContainer(mainContainer);
-  const { socket, response } = Deno.upgradeWebSocket(req);
+  const { socket, response } = Deno.upgradeWebSocket(req, { idleTimeout: 30 });
 
   container.bindValue(TOKENS.Websocket, new Websocket(socket));
   container.bindFactory(
@@ -75,6 +98,8 @@ serve((req) => {
     } else {
       try {
         const data = JSON.parse(e.data);
+        bus.send(switchboard.dispatch(data));
+        //const method = data.method.toLowerCase();
 
         // A user wants to create a new game
         if (data.method === "create") {
@@ -156,7 +181,7 @@ serve((req) => {
           "clientId": connection.id,
         };
 
-        connection.websocket.send(JSON.stringify(payload));
+        //connection.websocket.send(JSON.stringify(payload));
       } catch (e) {
         console.error(e);
       }
