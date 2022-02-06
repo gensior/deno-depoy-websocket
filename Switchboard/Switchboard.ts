@@ -1,4 +1,5 @@
 import { Mediator, None, Option, Some } from "../deps.ts";
+import { Message } from "../Message.ts";
 import Channel from "./Channel.ts";
 import Connection from "./Connection.ts";
 import { Dispatcher } from "./Dispatcher.ts";
@@ -39,7 +40,7 @@ export default class Switchboard {
     else return None;
   }
 
-  public dispatch(message: unknown): void {
+  public dispatch(message: Message): void {
     const action = this.dispatcher.parseAction(message);
 
     action.match({

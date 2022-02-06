@@ -2,11 +2,11 @@ import {
   createContainer,
   injectable,
   Mediator,
-  None,
   serve,
   token,
 } from "./deps.ts";
 import { ActionHandler } from "./Handlers/ActionHandler.ts";
+import { Message } from "./Message.ts";
 import Websocket from "./services/Websocket.ts";
 import WebsocketBus from "./services/WebsocketBus.ts";
 import Connection from "./Switchboard/Connection.ts";
@@ -31,8 +31,9 @@ mainContainer.bindValue(TOKENS.Dispatcher, new Dispatcher());
 mainContainer.bindFactory(
   TOKENS.ActionHandler,
   injectable(
-    (mediator: Mediator) => new ActionHandler(mediator),
+    (mediator: Mediator, switchboard: Switchboard) => new ActionHandler(mediator, switchboard),
     TOKENS.Mediator,
+    TOKENS.Switchboard
   ),
 );
 mainContainer.bindFactory(
@@ -56,8 +57,6 @@ type Game = {
   state: { [key: string]: string };
   clients: Client[];
 };
-
-const games: { [key: string]: Game } = {};
 
 //@ts-ignore: this is ok
 serve((req) => {
@@ -97,91 +96,9 @@ serve((req) => {
       bus.send(switchboard.listChannels());
     } else {
       try {
-        const data = JSON.parse(e.data);
-        bus.send(switchboard.dispatch(data));
-        //const method = data.method.toLowerCase();
-
-        // A user wants to create a new game
-        if (data.method === "create") {
-          const gameId = crypto.randomUUID();
-          // Add the game to the game hashmap
-          games[gameId] = {
-            "id": gameId,
-            "balls": 20,
-            "clients": [],
-            "state": {},
-          };
-
-          // A payload to send back to the client
-          const payLoad = {
-            "method": "create",
-            "game": games[gameId], // the game state
-          };
-
-          // Get the connection from the hashmap of clients
-          const connectionOption = switchboard.getSocket(connection.id);
-          connectionOption.match({
-            some: (con) => con.websocket.send(JSON.stringify(payLoad)),
-            none: () => console.error(`Connection ${connection.id} not found`),
-          });
-        }
-
-        // A user wants to join
-        if (data.method === "join") {
-          const gameId = data.gameId;
-          const game = games[gameId];
-          if (game.clients.length >= 3) {
-            // sorry, max players reached
-            return;
-          }
-          const color = {
-            "0": "Red",
-            "1": "Green",
-            "2": "Blue",
-          }[game.clients.length]!;
-          game.clients.push({ "clientId": connection.id, "color": color });
-
-          /// start the game
-          // if (game.clients.length === 3) updateGameState();
-
-          const payLoad = {
-            "method": "join",
-            "game:": game,
-          };
-
-          // loop through all clients and tell them that people have joined
-          game.clients.forEach((c) => {
-            switchboard.getSocket(c.clientId).andThen((con) => {
-              con.websocket.send(JSON.stringify(payLoad));
-              return None;
-            });
-          });
-        }
-
-        // a user plays a move
-        if (data.method === "play") {
-          const gameId = data.gameId;
-          const ballId = data.ballId;
-          const color = data.color;
-          let state = games[gameId].state;
-          if (!state) state = {};
-
-          state[ballId] = color;
-          games[gameId].state = state;
-
-          updateGameState(gameId);
-        }
-
-        if (data.action == "joinChannel") {
-          switchboard.joinChannel(data.channel, connection);
-        }
-
-        const payload = {
-          "method": "connect",
-          "clientId": connection.id,
-        };
-
-        //connection.websocket.send(JSON.stringify(payload));
+        const json = JSON.parse(e.data);
+        const message = new Message(json.action, connection.id, json.data);
+        switchboard.dispatch(message);
       } catch (e) {
         console.error(e);
       }
@@ -197,20 +114,5 @@ serve((req) => {
 
   return response;
 });
-
-function updateGameState(gameId: string): void {
-  const game = games[gameId];
-  const payload = {
-    "method": "update",
-    "game": game,
-  };
-
-  game.clients.forEach((c) => {
-    switchboard.getSocket(c.clientId).andThen((con) => {
-      con.websocket.send(JSON.stringify(payload));
-      return None;
-    });
-  });
-}
 
 console.log("Listening on http://localhost:8000");
