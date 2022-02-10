@@ -1,7 +1,7 @@
 import { randomString } from "../deps.ts";
-import { Lobby } from "../Lobby.ts";
+import { Lobby } from "../Domain/Lobby.ts";
 
-class LobbyFactory {
+export class LobbyFactory {
 
     public Create() : Lobby {
         const id = randomString.cryptoRandomString({length: 4, characters: 'ABCDEFGHIJKLMNOPQRSTUVWXYZ'});
@@ -9,4 +9,4 @@ class LobbyFactory {
     }
 }
 
-export default new LobbyFactory();
+export const LobbyFactorySingleton = new LobbyFactory();

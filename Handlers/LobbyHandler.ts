@@ -1,22 +1,39 @@
-import InternalEvents from "../Events/InternalEvents.ts";
-import LobbyFactory from "../Factories/LobbyFactory.ts";
+import { LobbyController, LobbyControllerSingleton } from "../Controllers/LobbyController.ts";
+import { InternalEvents, InternalEventsSingleton } from "../Events/InternalEvents.ts";
 
 class LobbyHandler {
-    private factory : typeof LobbyFactory
-    private events: typeof InternalEvents
+    private controller : LobbyController
+    private events: InternalEvents
 
-    constructor() {
-        this.factory = LobbyFactory
-        this.events = InternalEvents;
-        this.events.CreateLobby.attach((_x) => {
-            this.createLobby();
+    constructor(controller: LobbyController = LobbyControllerSingleton, events: InternalEvents = InternalEventsSingleton ) {
+        this.controller = controller
+        this.events = events;
+
+        this.events.CreateLobby.attach((x) => {
+            this.createLobby(x.connectionId);
+        })
+
+        // this.events.JoinLobby.attach((x) => {
+        //     this.joinLobby
+        // })
+    }
+
+    public createLobby(connectionId: string) : void {
+        const lobby = this.controller.create();
+
+        lobby.match({
+            ok: (val) => {
+                this.events.LobbyCreated.post({ creatorId: connectionId, lobbyId: val.id });
+            },
+            err: (_val) => {
+                // TODO: error message
+            }
         })
     }
 
-    public createLobby() : void {
-        const lobby = this.factory.Create();
-        this.events.LobbyCreated.post({id: lobby.id});
-    }
+    // public joinLobby(connectionId: string, lobbyId: string, userId: string) : void {
+    //     const user = 
+    // }
 }
 
-export default new LobbyHandler();
+export const LobbyHandlerSingleton = new LobbyHandler();
