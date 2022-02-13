@@ -1,19 +1,16 @@
 import { Result,Ok,Err } from "../deps.ts";
 import { Lobby } from "../Domain/Lobby.ts";
-import { LobbyFactory, LobbyFactorySingleton } from "../Factories/LobbyFactory.ts";
 import { LobbyRepository, LobbyRepositorySingleton } from "../Repositories/LobbyRepository.ts";
 
 export class LobbyController {
     private repository : LobbyRepository
-    private factory : LobbyFactory;
 
-    constructor(factory: LobbyFactory = LobbyFactorySingleton, repository: LobbyRepository = LobbyRepositorySingleton) {
-        this.factory = factory;
+    constructor(repository: LobbyRepository = LobbyRepositorySingleton) {
         this.repository = repository;
     }
 
     public create() : Result<Lobby, string> {
-        const lobby = this.factory.Create();
+        const lobby = Lobby.Create();
         const lobbyResult = this.repository.save(lobby);
 
         return lobbyResult.match({

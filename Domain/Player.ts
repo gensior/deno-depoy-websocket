@@ -1,17 +1,25 @@
 import User from "../Domain/User.ts";
 import { Color } from "./Colors.ts";
 import { IIdentifiable } from "./IIdentifiable.ts";
+import { Lobby } from "./Lobby.ts";
 
 export class Player implements IIdentifiable {
-    public user: User;
-    public color: Color;
+  public user: User;
+  public color: Color;
+  public lobby: Lobby;
 
-    constructor(user: User, color: Color) {
-        this.user = user;
-        this.color = color;
-    }
+  constructor(user: User, color: Color, lobby: Lobby) {
+    this.user = user;
+    this.color = color;
+    this.lobby = lobby;
+    this.user.setPlayer(this);
+  }
 
-    get id() {
-        return this.user.id
-    }
+  get id() {
+    return this.user.id;
+  }
+
+  get name() {
+    return this.user.name;
+  }
 }
