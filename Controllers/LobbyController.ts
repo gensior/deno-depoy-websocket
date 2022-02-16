@@ -1,53 +1,47 @@
-import { Result,Ok,Err } from "../deps.ts";
+import { Err, Ok, Result } from "../deps.ts";
 import { Lobby } from "../Domain/Lobby.ts";
-import { LobbyRepository, LobbyRepositorySingleton } from "../Repositories/LobbyRepository.ts";
+import User from "../Domain/User.ts";
+import {
+  LobbyRepository,
+  LobbyRepositorySingleton,
+} from "../Repositories/LobbyRepository.ts";
 
 export class LobbyController {
-    private repository : LobbyRepository
+  constructor(private repository: LobbyRepository = LobbyRepositorySingleton) {
+    console.log("Constructing lobby controller");
+    this.repository = repository;
+  }
 
-    constructor(repository: LobbyRepository = LobbyRepositorySingleton) {
-        this.repository = repository;
-    }
+  public create(user: User): Result<Lobby, string> {
+    const lobby = Lobby.Create(user);
+    return this.repository.save(lobby);
+  }
 
-    public create() : Result<Lobby, string> {
-        const lobby = Lobby.Create();
-        const lobbyResult = this.repository.save(lobby);
+  public delete(id: string): Result<boolean, string> {
+    const lobby = this.get(id);
 
-        return lobbyResult.match({
-            ok: (val) : Result<Lobby, string> => {
-                return Ok(val)
-            },
-            err: (val) : Result<Lobby, string> => {
-                return Err(val)
-            }
-        })
-    }
+    return lobby.match({
+      ok: (val): Result<boolean, string> => {
+        if (this.repository.delete(val.id)) {
+          return Ok(true);
+        } else {
+          return Err("Could not delete lobby.");
+        }
+      },
+      err: (val): Result<boolean, string> => {
+        return Err(val);
+      },
+    });
+  }
 
-    public delete(id: string) : Result<boolean, string> {
-        const lobby = this.get(id);
+  public get(id: string): Result<Lobby, string> {
+    const lobby = this.repository.get(id);
 
-        return lobby.match({
-            ok: (val) : Result<boolean, string> => {
-                if (this.repository.delete(val.id)) {
-                    return Ok(true);
-                } else {
-                    return Err("Could not delete lobby.");
-                }
-            },
-            err: (val) : Result<boolean, string> => {
-                return Err(val);
-            }
-        })
-    }
-
-    public get(id: string) : Result<Lobby, string> {
-        const lobby = this.repository.get(id);
-
-        return lobby.match({
-            some: (val) : Result<Lobby, string> => Ok(val),
-            none: () : Result<Lobby, string> => Err("Could not find lobby.")
-        })
-    }
+    return lobby.match({
+      some: (val): Result<Lobby, string> => Ok(val),
+      none: (): Result<Lobby, string> => Err("Could not find lobby."),
+    });
+  }
 }
 
 export const LobbyControllerSingleton = new LobbyController();

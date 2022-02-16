@@ -1,4 +1,4 @@
-import { Err, Ok, Option, Result } from "../deps.ts";
+import { Err, Ok, Result } from "../deps.ts";
 import User from "../Domain/User.ts";
 import {
   UserRepository,

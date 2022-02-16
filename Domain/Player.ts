@@ -1,3 +1,4 @@
+import { Result } from "../deps.ts";
 import User from "../Domain/User.ts";
 import { Color } from "./Colors.ts";
 import { IIdentifiable } from "./IIdentifiable.ts";
@@ -21,5 +22,11 @@ export class Player implements IIdentifiable {
 
   get name() {
     return this.user.name;
+  }
+
+  public leaveLobby(): Result<Player, string> {
+    return this.lobby.leaveLobby(this.id).map((_) => {
+      return this;
+    });
   }
 }

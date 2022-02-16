@@ -1,6 +1,6 @@
 import { Err, Ok, randomString, Result } from "../deps.ts";
 import { BaseDomain } from "./BaseDomain.ts";
-import { ColorPool } from "./Colors.ts";
+import { Color, ColorPool } from "./Colors.ts";
 import { Player } from "./Player.ts";
 import User from "./User.ts";
 
@@ -10,18 +10,20 @@ export class Lobby extends BaseDomain {
   public readonly players: Map<string, Player>;
   private readonly colorPool: ColorPool;
 
-  public static Create(): Lobby {
+  public static Create(creator: User): Lobby {
     const id = randomString.cryptoRandomString({
       length: 4,
       characters: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
     });
-    return new Lobby(id);
+    return new Lobby(id, creator);
   }
 
-  private constructor(id: string) {
+  private constructor(id: string, creator: User) {
     super(id);
     this.colorPool = new ColorPool();
     this.players = new Map<string, Player>();
+
+    this.events.LobbyCreated.post({ lobbyId: this.id, creatorId: creator.id });
   }
 
   public getPlayer(id: string): Result<Player, string> {
@@ -33,6 +35,10 @@ export class Lobby extends BaseDomain {
     }
   }
 
+  public availableColors(): Color[] {
+    return [...this.colorPool.choices].sort();
+  }
+
   public JoinLobby(user: User): Result<Player, string> {
     if (this.players.size < MAX_PLAYERS) {
       const colorOption = this.colorPool.pull();
@@ -41,6 +47,10 @@ export class Lobby extends BaseDomain {
         some: (x): Result<Player, string> => {
           const player = new Player(user, x, this);
           this.players.set(player.id, player);
+          this.events.JoinedLobby.post({
+            lobbyId: this.id,
+            playerId: player.id,
+          });
           return Ok(player);
         },
         none: (): Result<Player, string> =>
@@ -51,7 +61,7 @@ export class Lobby extends BaseDomain {
     }
   }
 
-  public LeaveLobby(id: string): Result<User, string> {
+  public leaveLobby(id: string): Result<User, string> {
     if (this.players.has(id)) {
       const player = this.players.get(id)!;
       this.colorPool.put(player.color);

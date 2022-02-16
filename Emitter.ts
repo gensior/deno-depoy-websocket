@@ -48,22 +48,17 @@ export class Emitter {
   public joinedLobbyHandler(x: IJoinedLobby): void {
     // Get lobby
     this.lobbyController.get(x.lobbyId).andThen((lobby) =>
-      lobby.getPlayer(x.playerId).andThen((player) =>
-        player.user.connection.match({
-          some: (conn): Result<Connection, string> => {
-            this.switchboard.Send(
-              JSON.stringify(LobbyWTO.FromLobby(lobby)),
-              conn.id,
-            );
-            lobby.Broadcast(
-              JSON.stringify(PlayerWTO.FromPlayer(player)),
-              player.id,
-            );
-            return Ok(conn);
-          },
-          none: (): Result<Connection, string> => Err("No connection found."),
-        })
-      )
+      lobby.getPlayer(x.playerId).map((player) => {
+        const user = player.user;
+        this.switchboard.Send(
+          JSON.stringify(LobbyWTO.FromLobby(lobby)),
+          user.id,
+        );
+        lobby.Broadcast(
+          JSON.stringify(PlayerWTO.FromPlayer(player)),
+          player.id,
+        );
+      })
     ).mapErr((err) => console.error(err));
   }
 }

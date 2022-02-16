@@ -4,28 +4,26 @@ import {
 } from "../Controllers/LobbyController.ts";
 import { UserControllerSingleton } from "../Controllers/UserController.ts";
 import { UserController } from "../Controllers/UserController.ts";
-import { Err, Ok, Result } from "../deps.ts";
-import { Lobby } from "../Domain/Lobby.ts";
-import User from "../Domain/User.ts";
 import {
   ICreateLobby,
   IJoinLobby,
   InternalEvents,
   InternalEventsSingleton,
 } from "../Events/InternalEvents.ts";
-import { PlayerWTO } from "../WTOs/PlayerWTO.ts";
 
 class LobbyHandler {
-  private controller: LobbyController;
+  private lobbyController: LobbyController;
   private userController: UserController;
   private events: InternalEvents;
+  private lobbyControllerCreate;
 
   constructor(
     controller: LobbyController = LobbyControllerSingleton,
     userController: UserController = UserControllerSingleton,
     events: InternalEvents = InternalEventsSingleton,
   ) {
-    this.controller = controller;
+    this.lobbyController = controller;
+    this.lobbyControllerCreate = controller.create;
     this.userController = userController;
     this.events = events;
 
@@ -39,39 +37,17 @@ class LobbyHandler {
   }
 
   public createLobbyHandler(event: ICreateLobby): void {
-    this.userController.get(event.userId).andThen((user) => {
-      return user.connection.match({
-        some: (x) => {
-          return this.controller.create().andThen((lobby) => {
-            this.events.LobbyCreated.post({
-              creatorId: x.id,
-              lobbyId: lobby.id,
-            });
-            return Ok(lobby);
-          });
-        },
-        none: (): Result<Lobby, string> =>
-          Err("User does not have a connection."),
-      });
-    }).mapErr((err) => console.error(err));
+    this.userController.get(event.userId)
+      .andThen((user) => this.lobbyController.create(user))
+      .mapErr(console.error);
   }
 
   public joinLobbyHandler(event: IJoinLobby): void {
     this.userController.get(event.userId).andThen((user) =>
-      this.controller.get(event.lobbyId).andThen((lobby) =>
+      this.lobbyController.get(event.lobbyId).andThen((lobby) =>
         lobby.JoinLobby(user)
       )
-    ).match({
-      ok: (player) => {
-        this.events.JoinedLobby.post({
-          lobbyId: event.lobbyId,
-          playerId: player.id,
-        });
-      },
-      err: (e) => {
-        console.error(e);
-      },
-    });
+    ).mapErr(console.error);
   }
 }
 
