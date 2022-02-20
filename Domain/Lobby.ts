@@ -1,9 +1,4 @@
-import { Err, Ok, randomString, Result } from "../deps.ts";
-import {
-  CreateLobbyAction,
-  IAction,
-  ISendMessageAction,
-} from "../Events/InternalActions.ts";
+import { Err, None, Ok, Option, randomString, Result, Some } from "../deps.ts";
 import { BaseDomain } from "./BaseDomain.ts";
 import { Color, ColorPool } from "./Colors.ts";
 import { Message } from "./Message.ts";
@@ -13,11 +8,6 @@ import User from "./User.ts";
 const MAX_PLAYERS = 6;
 
 export class Lobby extends BaseDomain {
-  public readonly players: Map<string, Player>;
-  private readonly colorPool: ColorPool;
-  public readonly actions: IAction[];
-  public readonly messages: Message[];
-
   public static Create(): Lobby {
     const id = randomString.cryptoRandomString({
       length: 4,
@@ -26,31 +16,14 @@ export class Lobby extends BaseDomain {
     return new Lobby(id);
   }
 
-  private constructor(id: string) {
+  private constructor(
+    id: string,
+    public readonly players: Map<string, Player> = new Map<string, Player>(),
+    private readonly colorPool: ColorPool = new ColorPool(),
+    public readonly messages: Message[] = [],
+    private admin: Option<Player> = None,
+  ) {
     super(id);
-    this.colorPool = new ColorPool();
-    this.actions = [new CreateLobbyAction()];
-    this.players = new Map<string, Player>();
-    this.messages = [];
-  }
-
-  public Do(action: IAction): void {
-    this.actions.push(action);
-    switch (action.type) {
-      case "JoinLobby": {
-        // const a = action as unknown as IJoinLobbyAction
-        // this.JoinLobby(a.user);
-        break;
-      }
-      case "SendMessage": {
-        //const a = action as unknown as ISendMessageAction
-
-        break;
-      }
-      default: {
-        break;
-      }
-    }
   }
 
   public getPlayer(id: string): Result<Player, string> {
@@ -62,21 +35,32 @@ export class Lobby extends BaseDomain {
     }
   }
 
+  public getAdmin(): Option<Player> {
+    if (!this.players.size) return None;
+    const value = this.players.values().next().value;
+
+    if (value) {
+      return Some(value as Player);
+    } else {
+      return None;
+    }
+  }
+
   public availableColors(): Color[] {
     return [...this.colorPool.choices].sort();
   }
 
-  public JoinLobby(user: User): Result<Player, string> {
+  public JoinLobby(user: User): Result<Lobby, string> {
     if (this.players.size < MAX_PLAYERS) {
       const colorOption = this.colorPool.pull();
 
       return colorOption.match({
-        some: (x): Result<Player, string> => {
+        some: (x): Result<Lobby, string> => {
           const player = new Player(user, x, this);
           this.players.set(player.id, player);
-          return Ok(player);
+          return Ok(this);
         },
-        none: (): Result<Player, string> =>
+        none: (): Result<Lobby, string> =>
           Err("No colors available to assign to player."),
       });
     } else {
@@ -87,17 +71,18 @@ export class Lobby extends BaseDomain {
   public AddMessage(message: Message): void {
   }
 
-  public leaveLobby(id: string): Result<User, string> {
-    if (this.players.has(id)) {
-      const player = this.players.get(id)!;
+  public leaveLobby(player: Player): Result<Lobby, string> {
+    if (this.players.has(player.id)) {
       this.colorPool.put(player.color);
-      if (this.players.delete(id)) {
+      if (this.players.delete(player.id)) {
         player.user.clearPlayer();
-        return Ok(player.user);
+        return Ok(this);
       } else {
+        console.error("Could not remove player from lobby");
         return Err("Could not remove player from lobby.");
       }
     } else {
+      console.error("Player not in lobby.");
       return Err("Player not in lobby.");
     }
   }

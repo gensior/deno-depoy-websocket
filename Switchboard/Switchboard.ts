@@ -13,6 +13,8 @@ import { MediatorSingleton } from "../Mediator/Mediators.ts";
 import {
   Broadcast,
   CreateLobbyNotification,
+  JoinLobbyNotification,
+  LeaveLobbyNotification,
   Notify,
   Send,
 } from "../Mediator/Notifications.ts";
@@ -62,17 +64,13 @@ export class Switchboard {
     return connection;
   }
 
-  public disconnectSocket(connection: Connection): void {
+  public async disconnectSocket(connection: Connection): Promise<void> {
+    const user = connection.user;
     this.connections.delete(connection.id);
 
-    connection.user.isPlaying();
-
-    connection.user.player.match({
-      some: (player) => {
-        player.leaveLobby();
-      },
-      none: () => {},
-    });
+    if (user.isPlaying()) {
+      await this.mediator.publish(new LeaveLobbyNotification(user.id));
+    }
   }
 
   public getConnection(id: string): Option<Connection> {
@@ -97,13 +95,16 @@ export class Switchboard {
         await this.mediator.publish(
           new CreateLobbyNotification(message.user.id),
         );
-        // this.events.CreateLobbyBus.post(new CreateLobbyAction());
         break;
       case "joinlobby":
-        // this.events.JoinLobby.post({
-        //   lobbyId: message.data.lobbyId,
-        //   userId: message.user.id,
-        // });
+        await this.mediator.publish(
+          new JoinLobbyNotification(message.user.id, message.data.lobbyId),
+        );
+        break;
+      case "leavelobby":
+        await this.mediator.publish(
+          new LeaveLobbyNotification(message.user.id),
+        );
         break;
       case "sendMessage":
         break;

@@ -33,3 +33,35 @@ export class LobbyCreatedNotification extends Notification {
     super();
   }
 }
+
+export class JoinLobbyNotification extends Notification {
+  constructor(public userId: string, public lobbyKey: string) {
+    super();
+  }
+}
+export class LobbyJoinedNotification extends Notification {
+  constructor(public userId: string, public lobbyKey: string) {
+    super();
+  }
+}
+
+export class LeaveLobbyNotification extends Notification {
+  constructor(public userId: string) {
+    super();
+  }
+}
+
+export class LobbyLeftNotification extends Notification {
+  constructor(
+    public userId: string,
+    public lobbyKey: string,
+  ) {
+    super();
+  }
+}
+
+export class NewAdminNotification extends Notification {
+  constructor(public adminId: string, public lobbyKey: string) {
+    super();
+  }
+}

@@ -1,4 +1,5 @@
-import { Err, Ok, Result } from "../deps.ts";
+import { Err, Ok, Option, Result } from "../deps.ts";
+import { Player } from "../Domain/Player.ts";
 import User from "../Domain/User.ts";
 import {
   UserRepository,
@@ -38,6 +39,10 @@ export class UserController {
       some: (val): Result<User, string> => Ok(val),
       none: (): Result<User, string> => Err("Could not find user."),
     });
+  }
+
+  public getPlayerFromUserId(id: string): Option<Player> {
+    return this.repository.get(id).andThen((user) => user.player);
   }
 }
 

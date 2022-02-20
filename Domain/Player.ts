@@ -25,7 +25,7 @@ export class Player implements IIdentifiable {
   }
 
   public leaveLobby(): Result<Player, string> {
-    return this.lobby.leaveLobby(this.id).map((_) => {
+    return this.lobby.leaveLobby(this).map((_) => {
       return this;
     });
   }

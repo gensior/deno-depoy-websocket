@@ -60,7 +60,9 @@ serve((req: Request) => {
 
   //@ts-ignore: this is ok
   socket.onerror = (e) => console.log("socket errored:", e.message);
-  socket.onclose = () => {};
+  socket.onclose = async () => {
+    await switchboard.disconnectSocket(connection);
+  };
 
   return response;
 });

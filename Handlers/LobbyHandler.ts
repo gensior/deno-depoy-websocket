@@ -4,15 +4,21 @@ import {
 } from "../Controllers/LobbyController.ts";
 import { UserControllerSingleton } from "../Controllers/UserController.ts";
 import { UserController } from "../Controllers/UserController.ts";
-import { Err, Mediator, Ok, Result } from "../deps.ts";
-import { Player } from "../Domain/Player.ts";
+import { Mediator } from "../deps.ts";
 import { MediatorSingleton } from "../Mediator/Mediators.ts";
 import {
   Broadcast,
   CreateLobbyNotification,
+  JoinLobbyNotification,
+  LeaveLobbyNotification,
   LobbyCreatedNotification,
+  LobbyJoinedNotification,
+  LobbyLeftNotification,
+  NewAdminNotification,
+  Notify,
   Send,
 } from "../Mediator/Notifications.ts";
+import { LobbyWTO } from "../WTOs/LobbyWTO.ts";
 import { PlayerWTO } from "../WTOs/PlayerWTO.ts";
 
 class LobbyHandler {
@@ -34,9 +40,143 @@ class LobbyHandler {
       return this.lobbyCreatedHandler(notification);
     });
 
-    // this.events.JoinLobby.attach((x) => {
-    //   this.joinLobbyHandler(x);
-    // });
+    this.mediator.handle(JoinLobbyNotification, (notification) => {
+      return this.joinLobbyHandler(notification);
+    });
+
+    this.mediator.handle(LobbyJoinedNotification, (notification) => {
+      return this.lobbyJoinedHandler(notification);
+    });
+
+    this.mediator.handle(LeaveLobbyNotification, (notification) => {
+      return this.leaveLobbyHandler(notification);
+    });
+
+    this.mediator.handle(LobbyLeftNotification, (notification) => {
+      return this.lobbyLeftHandler(notification);
+    });
+
+    this.mediator.handle(NewAdminNotification, (notification) => {
+      return this.newAdminHandler(notification);
+    });
+  }
+
+  public newAdminHandler(
+    notification: NewAdminNotification,
+  ): Promise<void> {
+    const lobbyKey = notification.lobbyKey;
+    return this.lobbyController.get(lobbyKey).map((lobby) => {
+      lobby.getAdmin().map((admin) => {
+        admin.user.connection.map((conn) => {
+          this.mediator.publish(
+            new Notify(lobbyKey, { newAdmin: conn.id }),
+          );
+        });
+      });
+    }).match({
+      ok: (_) => Promise.resolve(),
+      err: (e) => {
+        console.error(e);
+        return Promise.reject();
+      },
+    });
+  }
+
+  public lobbyLeftHandler(
+    notification: LobbyLeftNotification,
+  ): Promise<void> {
+    const userId = notification.userId;
+    const lobbyKey = notification.lobbyKey;
+    return this.lobbyController.get(lobbyKey).map((lobby) => {
+      this.userController.get(userId).map((user) => {
+        user.connection.map((conn) => {
+          this.mediator.publish(new Notify(lobby.id, { userLeft: conn.id }));
+        });
+      });
+    }).match({
+      ok: (_) => Promise.resolve(),
+      err: (e) => {
+        console.error(e);
+        return Promise.reject();
+      },
+    });
+  }
+
+  public leaveLobbyHandler(
+    notification: LeaveLobbyNotification,
+  ): Promise<void> {
+    const userId = notification.userId;
+    return this.userController.getPlayerFromUserId(userId).map((player) => {
+      const lobby = player.lobby;
+      let newadmin = false;
+      lobby.getAdmin().map((admin) => {
+        newadmin = admin.id === player.id;
+      });
+      lobby.leaveLobby(player).map((_) => {
+        this.mediator.publish(
+          new LobbyLeftNotification(userId, lobby.id),
+        );
+        if (newadmin) {
+          this.mediator.publish(
+            new NewAdminNotification(player.id, lobby.id),
+          );
+        }
+      });
+    }).match({
+      some: (_) => Promise.resolve(),
+      none: () => {
+        //console.error(e);
+        return Promise.reject();
+      },
+    });
+  }
+
+  public lobbyJoinedHandler(
+    notification: LobbyJoinedNotification,
+  ): Promise<void> {
+    return this.lobbyController.get(notification.lobbyKey).map((lobby) => {
+      this.userController.get(notification.userId).map((user) => {
+        user.player.map((player) => {
+          this.mediator.publish(
+            new Send(notification.userId, LobbyWTO.FromLobby(lobby)),
+          );
+          this.mediator.publish(
+            new Broadcast(
+              notification.userId,
+              notification.lobbyKey,
+              PlayerWTO.FromPlayer(player),
+            ),
+          );
+        });
+      });
+    }).match({
+      ok: (_) => Promise.resolve(),
+      err: (e) => {
+        console.error(e);
+        return Promise.reject();
+      },
+    });
+  }
+
+  public joinLobbyHandler(notification: JoinLobbyNotification): Promise<void> {
+    return this.lobbyController.get(notification.lobbyKey).map((lobby) => {
+      this.userController.get(notification.userId).map((user) => {
+        lobby.JoinLobby(user).map((_) => {
+          this.mediator.publish(
+            new LobbyJoinedNotification(
+              notification.userId,
+              notification.lobbyKey,
+            ),
+          );
+        });
+      });
+    }).match({
+      ok: (_) => Promise.resolve(),
+      err: (e) => {
+        console.error(e);
+        return Promise.reject();
+      },
+    });
   }
 
   public createLobbyHandler(
@@ -65,14 +205,6 @@ class LobbyHandler {
       new Send(notification.userId, { lobbyKey: notification.lobbyKey }),
     );
   }
-
-  // public joinLobbyHandler(event: IJoinLobby): void {
-  //   this.userController.get(event.userId).andThen((user) =>
-  //     this.lobbyController.get(event.lobbyId).andThen((lobby) =>
-  //       lobby.JoinLobby(user)
-  //     )
-  //   ).mapErr(console.error);
-  // }
 }
 
 export const LobbyHandlerSingleton = new LobbyHandler();
