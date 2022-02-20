@@ -1,6 +1,5 @@
 import { Err, Ok, Result } from "../deps.ts";
 import { Lobby } from "../Domain/Lobby.ts";
-import User from "../Domain/User.ts";
 import {
   LobbyRepository,
   LobbyRepositorySingleton,
@@ -8,12 +7,11 @@ import {
 
 export class LobbyController {
   constructor(private repository: LobbyRepository = LobbyRepositorySingleton) {
-    console.log("Constructing lobby controller");
     this.repository = repository;
   }
 
-  public create(user: User): Result<Lobby, string> {
-    const lobby = Lobby.Create(user);
+  public create(): Result<Lobby, string> {
+    const lobby = Lobby.Create();
     return this.repository.save(lobby);
   }
 

@@ -1,6 +1,12 @@
 import { Err, Ok, randomString, Result } from "../deps.ts";
+import {
+  CreateLobbyAction,
+  IAction,
+  ISendMessageAction,
+} from "../Events/InternalActions.ts";
 import { BaseDomain } from "./BaseDomain.ts";
 import { Color, ColorPool } from "./Colors.ts";
+import { Message } from "./Message.ts";
 import { Player } from "./Player.ts";
 import User from "./User.ts";
 
@@ -9,21 +15,42 @@ const MAX_PLAYERS = 6;
 export class Lobby extends BaseDomain {
   public readonly players: Map<string, Player>;
   private readonly colorPool: ColorPool;
+  public readonly actions: IAction[];
+  public readonly messages: Message[];
 
-  public static Create(creator: User): Lobby {
+  public static Create(): Lobby {
     const id = randomString.cryptoRandomString({
       length: 4,
       characters: "ABCDEFGHIJKLMNOPQRSTUVWXYZ",
     });
-    return new Lobby(id, creator);
+    return new Lobby(id);
   }
 
-  private constructor(id: string, creator: User) {
+  private constructor(id: string) {
     super(id);
     this.colorPool = new ColorPool();
+    this.actions = [new CreateLobbyAction()];
     this.players = new Map<string, Player>();
+    this.messages = [];
+  }
 
-    this.events.LobbyCreated.post({ lobbyId: this.id, creatorId: creator.id });
+  public Do(action: IAction): void {
+    this.actions.push(action);
+    switch (action.type) {
+      case "JoinLobby": {
+        // const a = action as unknown as IJoinLobbyAction
+        // this.JoinLobby(a.user);
+        break;
+      }
+      case "SendMessage": {
+        //const a = action as unknown as ISendMessageAction
+
+        break;
+      }
+      default: {
+        break;
+      }
+    }
   }
 
   public getPlayer(id: string): Result<Player, string> {
@@ -47,10 +74,6 @@ export class Lobby extends BaseDomain {
         some: (x): Result<Player, string> => {
           const player = new Player(user, x, this);
           this.players.set(player.id, player);
-          this.events.JoinedLobby.post({
-            lobbyId: this.id,
-            playerId: player.id,
-          });
           return Ok(player);
         },
         none: (): Result<Player, string> =>
@@ -59,6 +82,9 @@ export class Lobby extends BaseDomain {
     } else {
       return Err("Lobby is full.");
     }
+  }
+
+  public AddMessage(message: Message): void {
   }
 
   public leaveLobby(id: string): Result<User, string> {
@@ -79,26 +105,6 @@ export class Lobby extends BaseDomain {
   public destroy(): void {
     this.players.forEach((player) => {
       player.user.clearPlayer();
-    });
-  }
-
-  public Notify(message: string): void {
-    this.players.forEach((value) => {
-      value.user.connection.match({
-        some: (val) => val.websocket.send(message),
-        none: () => {},
-      });
-    });
-  }
-
-  public Broadcast(message: string, sender: string): void {
-    this.players.forEach((value, key) => {
-      if (key != sender) {
-        value.user.connection.match({
-          some: (val) => val.websocket.send(message),
-          none: () => {},
-        });
-      }
     });
   }
 }

@@ -13,7 +13,7 @@ export abstract class BaseRepo<T extends IIdentifiable> {
       this.entities.set(entity.id, entity);
       return Ok(entity);
     } else {
-      return Err("Item already exists with the same name.");
+      return Err("Item already exists with the same id.");
     }
   }
 

@@ -1,6 +1,6 @@
 import User from "./Domain/User.ts";
 
-export class Message {
+export class SocketMessage {
   public time: number;
 
   // deno-lint-ignore no-explicit-any

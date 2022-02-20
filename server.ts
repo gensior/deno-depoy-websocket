@@ -4,15 +4,11 @@ import {
 } from "./Controllers/UserController.ts";
 import { Err, Result, serve } from "./deps.ts";
 import User from "./Domain/User.ts";
-import { EmitterSingleton } from "./Emitter.ts";
 import { LobbyHandlerSingleton } from "./Handlers/LobbyHandler.ts";
-import { ListenerSingleton } from "./Listener.ts";
-import { Message } from "./Message.ts";
+import { SocketMessage } from "./SocketMessage.ts";
 import Connection from "./Switchboard/Connection.ts";
 import { SwitchboardSingleton } from "./Switchboard/Switchboard.ts";
 
-const _emitter = EmitterSingleton;
-const listener = ListenerSingleton;
 const switchboard = SwitchboardSingleton;
 const _lobbyHandler = LobbyHandlerSingleton;
 const userController = UserControllerSingleton;
@@ -49,12 +45,12 @@ serve((req: Request) => {
   socket.onmessage = (e) => {
     try {
       const json = JSON.parse(e.data);
-      const message = new Message(
+      const message = new SocketMessage(
         connection.user,
         json.action,
         json.data || {},
       );
-      listener.dispatch(message);
+      switchboard.dispatch(message);
       // const message = new Message(json.action, connection.id, json.data);
       // switchboard.dispatch(message);
     } catch (e) {
