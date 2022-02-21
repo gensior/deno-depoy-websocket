@@ -11,6 +11,7 @@ import {
   CreateLobbyNotification,
   JoinLobbyNotification,
   LeaveLobbyNotification,
+  LobbyCreatedErrorNotification,
   LobbyCreatedNotification,
   LobbyJoinedNotification,
   LobbyLeftNotification,
@@ -18,6 +19,10 @@ import {
   Notify,
   Send,
 } from "../Mediator/Notifications.ts";
+import {
+  lobbyCreatedError,
+  lobbyCreatedSuccess,
+} from "../Mediator/Responses.ts";
 import { LobbyWTO } from "../WTOs/LobbyWTO.ts";
 import { PlayerWTO } from "../WTOs/PlayerWTO.ts";
 
@@ -38,6 +43,10 @@ class LobbyHandler {
 
     this.mediator.handle(LobbyCreatedNotification, (notification) => {
       return this.lobbyCreatedHandler(notification);
+    });
+
+    this.mediator.handle(LobbyCreatedErrorNotification, (x) => {
+      return this.lobbyCreatedErrorHandler(x);
     });
 
     this.mediator.handle(JoinLobbyNotification, (notification) => {
@@ -182,27 +191,35 @@ class LobbyHandler {
   public createLobbyHandler(
     notification: CreateLobbyNotification,
   ): Promise<void> {
+    const userId = notification.userId;
     return this.userController.get(notification.userId)
-      .map((user) => {
-        this.lobbyController.create().map((lobby) => {
-          this.mediator.publish(
-            new LobbyCreatedNotification(user.id, lobby.id),
-          );
-        });
-      }).match({
-        ok: (_) => Promise.resolve(),
+      .andThen((_) => this.lobbyController.create())
+      .match({
+        ok: (lobby) => {
+          this.mediator.publish(new LobbyCreatedNotification(userId, lobby.id));
+          return Promise.resolve();
+        },
         err: (e) => {
+          this.mediator.publish(new LobbyCreatedErrorNotification(userId, e));
           console.error(e);
           return Promise.reject();
         },
       });
   }
 
+  public lobbyCreatedErrorHandler(
+    notification: LobbyCreatedErrorNotification,
+  ): Promise<void> {
+    return this.mediator.publish(
+      new Send(notification.userId, lobbyCreatedError(notification.err)),
+    );
+  }
+
   public lobbyCreatedHandler(
     notification: LobbyCreatedNotification,
   ): Promise<void> {
     return this.mediator.publish(
-      new Send(notification.userId, { lobbyKey: notification.lobbyKey }),
+      new Send(notification.userId, lobbyCreatedSuccess(notification.lobbyKey)),
     );
   }
 }

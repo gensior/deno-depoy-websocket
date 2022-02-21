@@ -33,6 +33,14 @@ export class LobbyCreatedNotification extends Notification {
     super();
   }
 }
+export class LobbyCreatedErrorNotification extends Notification {
+  constructor(
+    public userId: string,
+    public err: string,
+  ) {
+    super();
+  }
+}
 
 export class JoinLobbyNotification extends Notification {
   constructor(public userId: string, public lobbyKey: string) {
