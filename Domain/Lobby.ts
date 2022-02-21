@@ -58,6 +58,7 @@ export class Lobby extends BaseDomain {
         some: (x): Result<Lobby, string> => {
           const player = new Player(user, x, this);
           this.players.set(player.id, player);
+          user.setPlayer(player);
           return Ok(this);
         },
         none: (): Result<Lobby, string> =>

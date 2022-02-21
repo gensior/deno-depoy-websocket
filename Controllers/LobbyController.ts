@@ -37,7 +37,7 @@ export class LobbyController {
 
     return lobby.match({
       some: (val): Result<Lobby, string> => Ok(val),
-      none: (): Result<Lobby, string> => Err("Could not find lobby."),
+      none: (): Result<Lobby, string> => Err(`Could not find lobby '${id}'.`),
     });
   }
 }

@@ -1,10 +1,13 @@
+import { LobbyJoinedErrorNotification } from "file:///C:/Users/ComputerMan/source/repos/jewel-duel/combat-deno/Mediator/Notifications.ts";
 import {
   LobbyController,
   LobbyControllerSingleton,
 } from "../Controllers/LobbyController.ts";
 import { UserControllerSingleton } from "../Controllers/UserController.ts";
 import { UserController } from "../Controllers/UserController.ts";
-import { Mediator } from "../deps.ts";
+import { Err, Mediator, Ok, Result } from "../deps.ts";
+import { Lobby } from "../Domain/Lobby.ts";
+import User from "../Domain/User.ts";
 import { MediatorSingleton } from "../Mediator/Mediators.ts";
 import {
   Broadcast,
@@ -20,8 +23,13 @@ import {
   Send,
 } from "../Mediator/Notifications.ts";
 import {
+  leaveLobbyError,
+  leaveLobbySuccess,
   lobbyCreatedError,
   lobbyCreatedSuccess,
+  lobbyJoinedError,
+  playerJoinedLobby,
+  playerLeftLobby,
 } from "../Mediator/Responses.ts";
 import { LobbyWTO } from "../WTOs/LobbyWTO.ts";
 import { PlayerWTO } from "../WTOs/PlayerWTO.ts";
@@ -56,6 +64,9 @@ class LobbyHandler {
     this.mediator.handle(LobbyJoinedNotification, (notification) => {
       return this.lobbyJoinedHandler(notification);
     });
+    this.mediator.handle(LobbyJoinedErrorNotification, (x) => {
+      return this.lobbyJoinedErrorHandler(x);
+    });
 
     this.mediator.handle(LeaveLobbyNotification, (notification) => {
       return this.leaveLobbyHandler(notification);
@@ -70,156 +81,190 @@ class LobbyHandler {
     });
   }
 
+  public lobbyJoinedErrorHandler(
+    notification: LobbyJoinedErrorNotification,
+  ): Promise<void> {
+    const user = notification.user;
+    const reason = notification.err;
+
+    return this.mediator.publish(new Send(user.id, reason));
+  }
+
   public newAdminHandler(
     notification: NewAdminNotification,
   ): Promise<void> {
-    const lobbyKey = notification.lobbyKey;
-    return this.lobbyController.get(lobbyKey).map((lobby) => {
-      lobby.getAdmin().map((admin) => {
-        admin.user.connection.map((conn) => {
-          this.mediator.publish(
-            new Notify(lobbyKey, { newAdmin: conn.id }),
-          );
-        });
-      });
-    }).match({
-      ok: (_) => Promise.resolve(),
-      err: (e) => {
-        console.error(e);
-        return Promise.reject();
-      },
+    const lobby = notification.lobby;
+    const admin = notification.admin;
+
+    admin.user.connection.map((conn) => {
+      this.mediator.publish(
+        new Notify(lobby.id, { newAdmin: conn.id }),
+      );
     });
+
+    return Promise.resolve();
   }
 
   public lobbyLeftHandler(
     notification: LobbyLeftNotification,
   ): Promise<void> {
-    const userId = notification.userId;
-    const lobbyKey = notification.lobbyKey;
-    return this.lobbyController.get(lobbyKey).map((lobby) => {
-      this.userController.get(userId).map((user) => {
-        user.connection.map((conn) => {
-          this.mediator.publish(new Notify(lobby.id, { userLeft: conn.id }));
-        });
-      });
-    }).match({
-      ok: (_) => Promise.resolve(),
-      err: (e) => {
-        console.error(e);
-        return Promise.reject();
-      },
+    const user = notification.user;
+    const lobby = notification.lobby;
+
+    this.mediator.publish(new Send(user.id, leaveLobbySuccess(lobby.id)));
+    user.connection.map((conn) => {
+      this.mediator.publish(new Notify(lobby.id, playerLeftLobby(conn.id)));
     });
+
+    return Promise.resolve();
   }
 
   public leaveLobbyHandler(
     notification: LeaveLobbyNotification,
   ): Promise<void> {
-    const userId = notification.userId;
-    return this.userController.getPlayerFromUserId(userId).map((player) => {
-      const lobby = player.lobby;
+    const user = notification.user;
+    let lobby: Lobby;
+    user.player.map((player) => {
+      lobby = player.lobby;
       let newadmin = false;
       lobby.getAdmin().map((admin) => {
         newadmin = admin.id === player.id;
       });
       lobby.leaveLobby(player).map((_) => {
         this.mediator.publish(
-          new LobbyLeftNotification(userId, lobby.id),
+          new LobbyLeftNotification(user, lobby),
         );
         if (newadmin) {
           this.mediator.publish(
-            new NewAdminNotification(player.id, lobby.id),
+            new NewAdminNotification(player, lobby),
           );
         }
       });
     }).match({
       some: (_) => Promise.resolve(),
       none: () => {
-        //console.error(e);
-        return Promise.reject();
+        this.mediator.publish(
+          new Send(user.id, leaveLobbyError("User not in lobby.")),
+        );
       },
     });
+
+    return Promise.resolve();
   }
 
   public lobbyJoinedHandler(
     notification: LobbyJoinedNotification,
   ): Promise<void> {
-    return this.lobbyController.get(notification.lobbyKey).map((lobby) => {
-      this.userController.get(notification.userId).map((user) => {
-        user.player.map((player) => {
-          this.mediator.publish(
-            new Send(notification.userId, LobbyWTO.FromLobby(lobby)),
-          );
-          this.mediator.publish(
-            new Broadcast(
-              notification.userId,
-              notification.lobbyKey,
-              PlayerWTO.FromPlayer(player),
-            ),
-          );
-        });
-      });
-    }).match({
-      ok: (_) => Promise.resolve(),
-      err: (e) => {
-        console.error(e);
-        return Promise.reject();
-      },
+    const user = notification.user;
+    const lobby = notification.lobby;
+
+    user.player.map((player) => {
+      this.mediator.publish(
+        new Send(user.id, LobbyWTO.FromLobby(lobby)),
+      );
+      this.mediator.publish(
+        new Broadcast(
+          user.id,
+          lobby.id,
+          playerJoinedLobby(PlayerWTO.FromPlayer(player)),
+        ),
+      );
     });
+
+    return Promise.resolve();
   }
 
   public joinLobbyHandler(notification: JoinLobbyNotification): Promise<void> {
-    return this.lobbyController.get(notification.lobbyKey).map((lobby) => {
-      this.userController.get(notification.userId).map((user) => {
-        lobby.JoinLobby(user).map((_) => {
+    const lobbyKey = notification.lobbyKey;
+
+    let lobby: Lobby;
+    const user: User = notification.user;
+
+    this.lobbyController.get(lobbyKey)
+      .andThen((l) => {
+        lobby = l;
+
+        if (user.isPlaying()) {
+          return Err("User is already in a lobby.");
+        }
+
+        return lobby.JoinLobby(user);
+      }).match({
+        ok: (_) => {
           this.mediator.publish(
             new LobbyJoinedNotification(
-              notification.userId,
-              notification.lobbyKey,
+              user,
+              lobby,
             ),
           );
-        });
+        },
+        err: (err) => {
+          this.mediator.publish(new Send(user.id, lobbyJoinedError(err)));
+        },
       });
-    }).match({
-      ok: (_) => Promise.resolve(),
-      err: (e) => {
-        console.error(e);
-        return Promise.reject();
-      },
-    });
+
+    return Promise.resolve();
   }
 
   public createLobbyHandler(
     notification: CreateLobbyNotification,
   ): Promise<void> {
-    const userId = notification.userId;
-    return this.userController.get(notification.userId)
-      .andThen((_) => this.lobbyController.create())
-      .match({
-        ok: (lobby) => {
-          this.mediator.publish(new LobbyCreatedNotification(userId, lobby.id));
-          return Promise.resolve();
+    const user: User = notification.user;
+    let lobby: Lobby;
+
+    if (user.isPlaying()) {
+      this.mediator.publish(
+        new LobbyCreatedErrorNotification(user, "User is already in a lobby"),
+      );
+    } else {
+      this.lobbyController.create().match({
+        ok: (l): Result<User, string> => {
+          return l.JoinLobby(user).match({
+            ok: (lob): Result<User, string> => {
+              lobby = lob;
+              return Ok(user);
+            },
+            err: (err): Result<User, string> => Err(err),
+          });
         },
-        err: (e) => {
-          this.mediator.publish(new LobbyCreatedErrorNotification(userId, e));
-          console.error(e);
-          return Promise.reject();
-        },
-      });
+        err: (err): Result<User, string> => Err(err),
+      })
+        .match({
+          ok: (_) => {
+            this.mediator.publish(new LobbyCreatedNotification(user, lobby));
+          },
+          err: (e) => {
+            console.error(e);
+            this.mediator.publish(
+              new LobbyCreatedErrorNotification(user, e),
+            );
+          },
+        });
+    }
+
+    return Promise.resolve();
   }
 
   public lobbyCreatedErrorHandler(
     notification: LobbyCreatedErrorNotification,
   ): Promise<void> {
-    return this.mediator.publish(
-      new Send(notification.userId, lobbyCreatedError(notification.err)),
-    );
+    const user = notification.user;
+    const reason = notification.err;
+
+    return this.mediator.publish(new Send(user.id, lobbyCreatedError(reason)));
   }
 
   public lobbyCreatedHandler(
     notification: LobbyCreatedNotification,
   ): Promise<void> {
+    const lobby = notification.lobby;
+    const user = notification.user;
+
     return this.mediator.publish(
-      new Send(notification.userId, lobbyCreatedSuccess(notification.lobbyKey)),
+      new Send(
+        user.id,
+        lobbyCreatedSuccess(LobbyWTO.FromLobby(lobby)),
+      ),
     );
   }
 }

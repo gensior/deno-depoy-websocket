@@ -1,5 +1,8 @@
 // deno-lint-ignore-file no-explicit-any
 import { Notification } from "../deps.ts";
+import { Lobby } from "../Domain/Lobby.ts";
+import { Player } from "../Domain/Player.ts";
+import User from "../Domain/User.ts";
 
 export class Send extends Notification {
   constructor(public recipientId: string, public message: any) {
@@ -24,18 +27,18 @@ export class Broadcast extends Notification {
 }
 
 export class CreateLobbyNotification extends Notification {
-  constructor(public userId: string) {
+  constructor(public user: User) {
     super();
   }
 }
 export class LobbyCreatedNotification extends Notification {
-  constructor(public userId: string, public lobbyKey: string) {
+  constructor(public user: User, public lobby: Lobby) {
     super();
   }
 }
 export class LobbyCreatedErrorNotification extends Notification {
   constructor(
-    public userId: string,
+    public user: User,
     public err: string,
   ) {
     super();
@@ -43,33 +46,38 @@ export class LobbyCreatedErrorNotification extends Notification {
 }
 
 export class JoinLobbyNotification extends Notification {
-  constructor(public userId: string, public lobbyKey: string) {
+  constructor(public user: User, public lobbyKey: string) {
     super();
   }
 }
 export class LobbyJoinedNotification extends Notification {
-  constructor(public userId: string, public lobbyKey: string) {
+  constructor(public user: User, public lobby: Lobby) {
+    super();
+  }
+}
+export class LobbyJoinedErrorNotification extends Notification {
+  constructor(public user: User, public err: string) {
     super();
   }
 }
 
 export class LeaveLobbyNotification extends Notification {
-  constructor(public userId: string) {
+  constructor(public user: User) {
     super();
   }
 }
 
 export class LobbyLeftNotification extends Notification {
   constructor(
-    public userId: string,
-    public lobbyKey: string,
+    public user: User,
+    public lobby: Lobby,
   ) {
     super();
   }
 }
 
 export class NewAdminNotification extends Notification {
-  constructor(public adminId: string, public lobbyKey: string) {
+  constructor(public admin: Player, public lobby: Lobby) {
     super();
   }
 }

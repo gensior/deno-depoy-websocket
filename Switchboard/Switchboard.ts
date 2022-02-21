@@ -7,7 +7,6 @@ import {
   UserControllerSingleton,
 } from "../Controllers/UserController.ts";
 import { Mediator, None, Option, Some } from "../deps.ts";
-import { Lobby } from "../Domain/Lobby.ts";
 import User from "../Domain/User.ts";
 import { MediatorSingleton } from "../Mediator/Mediators.ts";
 import {
@@ -69,7 +68,7 @@ export class Switchboard {
     this.connections.delete(connection.id);
 
     if (user.isPlaying()) {
-      await this.mediator.publish(new LeaveLobbyNotification(user.id));
+      await this.mediator.publish(new LeaveLobbyNotification(user));
     }
   }
 
@@ -93,17 +92,17 @@ export class Switchboard {
     switch (action) {
       case "createlobby":
         await this.mediator.publish(
-          new CreateLobbyNotification(message.user.id),
+          new CreateLobbyNotification(message.user),
         );
         break;
       case "joinlobby":
         await this.mediator.publish(
-          new JoinLobbyNotification(message.user.id, message.data.lobbyId),
+          new JoinLobbyNotification(message.user, message.data.lobbyKey),
         );
         break;
       case "leavelobby":
         await this.mediator.publish(
-          new LeaveLobbyNotification(message.user.id),
+          new LeaveLobbyNotification(message.user),
         );
         break;
       case "sendMessage":
