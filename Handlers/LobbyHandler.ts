@@ -1,4 +1,3 @@
-import { LobbyJoinedErrorNotification } from "file:///C:/Users/ComputerMan/source/repos/jewel-duel/combat-deno/Mediator/Notifications.ts";
 import {
   LobbyController,
   LobbyControllerSingleton,
@@ -16,6 +15,7 @@ import {
   LeaveLobbyNotification,
   LobbyCreatedErrorNotification,
   LobbyCreatedNotification,
+  LobbyJoinedErrorNotification,
   LobbyJoinedNotification,
   LobbyLeftNotification,
   NewAdminNotification,
