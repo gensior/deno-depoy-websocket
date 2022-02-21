@@ -105,16 +105,19 @@ class LobbyHandler {
     return Promise.resolve();
   }
 
-  public lobbyLeftHandler(
+  public async lobbyLeftHandler(
     notification: LobbyLeftNotification,
   ): Promise<void> {
     const user = notification.user;
     const lobby = notification.lobby;
+    const connId = notification.connId;
 
-    this.mediator.publish(new Send(user.id, leaveLobbySuccess(lobby.id)));
-    user.connection.map((conn) => {
-      this.mediator.publish(new Notify(lobby.id, playerLeftLobby(conn.id)));
-    });
+    if (user.isConnected()) {
+      await this.mediator.publish(
+        new Send(user.id, leaveLobbySuccess(lobby.id)),
+      );
+    }
+    this.mediator.publish(new Notify(lobby.id, playerLeftLobby(connId)));
 
     return Promise.resolve();
   }
@@ -123,25 +126,35 @@ class LobbyHandler {
     notification: LeaveLobbyNotification,
   ): Promise<void> {
     const user = notification.user;
+    const connId = notification.connId;
     let lobby: Lobby;
-    user.player.map((player) => {
-      lobby = player.lobby;
-      let newadmin = false;
-      lobby.getAdmin().map((admin) => {
-        newadmin = admin.id === player.id;
-      });
-      lobby.leaveLobby(player).map((_) => {
-        this.mediator.publish(
-          new LobbyLeftNotification(user, lobby),
-        );
-        if (newadmin) {
-          this.mediator.publish(
-            new NewAdminNotification(player, lobby),
-          );
-        }
-      });
-    }).match({
-      some: (_) => Promise.resolve(),
+    user.player.match({
+      some: (player) => {
+        lobby = player.lobby;
+        let oldAdminId: string;
+        lobby.getAdmin().map((admin) => {
+          oldAdminId = admin.id;
+        });
+        lobby.leaveLobby(player).match({
+          ok: (_x) => {
+            this.mediator.publish(
+              new LobbyLeftNotification(connId, user, lobby),
+            );
+            lobby.getAdmin().map((currentAdmin) => {
+              if (currentAdmin.id !== oldAdminId) {
+                this.mediator.publish(
+                  new NewAdminNotification(currentAdmin, lobby),
+                );
+              }
+            });
+          },
+          err: (e) => {
+            this.mediator.publish(
+              new Send(user.id, leaveLobbyError(e)),
+            );
+          },
+        });
+      },
       none: () => {
         this.mediator.publish(
           new Send(user.id, leaveLobbyError("User not in lobby.")),

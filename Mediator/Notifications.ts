@@ -62,13 +62,14 @@ export class LobbyJoinedErrorNotification extends Notification {
 }
 
 export class LeaveLobbyNotification extends Notification {
-  constructor(public user: User) {
+  constructor(public connId: string, public user: User) {
     super();
   }
 }
 
 export class LobbyLeftNotification extends Notification {
   constructor(
+    public connId: string,
     public user: User,
     public lobby: Lobby,
   ) {

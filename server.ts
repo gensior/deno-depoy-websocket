@@ -46,6 +46,7 @@ serve((req: Request) => {
     try {
       const json = JSON.parse(e.data);
       const message = new SocketMessage(
+        connection.id,
         connection.user,
         json.action,
         json.data || {},

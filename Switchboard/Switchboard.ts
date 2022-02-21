@@ -66,9 +66,12 @@ export class Switchboard {
   public async disconnectSocket(connection: Connection): Promise<void> {
     const user = connection.user;
     this.connections.delete(connection.id);
+    user.clearConnection();
 
     if (user.isPlaying()) {
-      await this.mediator.publish(new LeaveLobbyNotification(user));
+      await this.mediator.publish(
+        new LeaveLobbyNotification(connection.id, user),
+      );
     }
   }
 
@@ -102,7 +105,7 @@ export class Switchboard {
         break;
       case "leavelobby":
         await this.mediator.publish(
-          new LeaveLobbyNotification(message.user),
+          new LeaveLobbyNotification(message.connId, message.user),
         );
         break;
       case "sendMessage":
